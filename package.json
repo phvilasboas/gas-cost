@@ -1,0 +1,14 @@
+{
+  "name": "gas-cost",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Controle pessoal de gastos com combustíveis",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

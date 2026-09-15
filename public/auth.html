@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Acesso seguro ao GasCost.">
+  <title>Entrar — GasCost</title>
+  <link rel="stylesheet" href="/assets/styles-v3.css">
+  <style>[hidden] { display: none !important; }</style>
+</head>
+<body class="auth-body">
+  <main class="auth-layout">
+    <section class="auth-story">
+      <a class="brand auth-brand" href="/">
+        <span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M7 3h8a2 2 0 0 1 2 2v14H5V5a2 2 0 0 1 2-2Zm0 2v5h8V5H7Zm10.8 2.3 2.7 2.7v7a2 2 0 0 1-4 0v-4h-1v-2h3V11l-2.1-2.1 1.4-1.6ZM3 19h16v2H3v-2Z"/></svg></span>
+        <span>GasCost</span>
+      </a>
+      <div><p class="eyebrow">CONTROLE PESSOAL</p><h1>Seus gastos.<br>Somente seus.</h1><p>Uma visão simples dos seus abastecimentos, agora protegida por acesso seguro.</p></div>
+      <small>Seus dados permanecem armazenados no seu próprio servidor.</small>
+    </section>
+    <section class="auth-panel">
+      <form id="auth-form" class="auth-card">
+        <div id="auth-loading">Preparando acesso...</div>
+        <div id="auth-content" hidden>
+          <p class="eyebrow" id="auth-eyebrow">BEM-VINDO DE VOLTA</p>
+          <h2 id="auth-title">Acesse sua conta</h2>
+          <p id="auth-description">Entre para visualizar seu painel de combustível.</p>
+          <label>Usuário<input name="username" autocomplete="username" minlength="3" maxlength="40" required autofocus></label>
+          <label>Senha<input name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required></label>
+          <label id="bootstrap-field" hidden>Token de configuração<input name="bootstrapToken" type="password" autocomplete="off" maxlength="256"></label>
+          <p class="password-hint" id="password-hint" hidden>Use pelo menos 12 caracteres. Uma frase longa é uma ótima senha.</p>
+          <p id="auth-error" class="form-error" role="alert"></p>
+          <button class="primary auth-submit" type="submit">Entrar</button>
+        </div>
+      </form>
+    </section>
+  </main>
+  <script src="/assets/auth-v3.js" defer></script>
+</body>
+</html>

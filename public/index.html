@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#185f43">
+  <meta name="description" content="Controle completo de combustível, consumo e manutenção do seu veículo.">
+  <title>GasCost — Controle do veículo</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/styles-v4.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="GasCost, início">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h8a2 2 0 0 1 2 2v14H5V5a2 2 0 0 1 2-2Zm0 2v5h8V5H7Zm10.8 2.3 2.7 2.7v7a2 2 0 0 1-4 0v-4h-1v-2h3V11l-2.1-2.1 1.4-1.6ZM3 19h16v2H3v-2Z"/></svg></span>
+        <span>GasCost</span>
+      </a>
+      <div class="top-actions">
+        <button class="install-button" id="install-app" type="button" hidden>Instalar app</button>
+        <span class="user-chip" id="current-user"></span>
+        <button class="logout-button" id="logout" type="button">Sair</button>
+        <button class="primary small" id="open-form" type="button"><span>＋</span> Novo abastecimento</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro">
+        <div>
+          <p class="eyebrow">VISÃO GERAL</p>
+          <h1>Seu veículo, em números.</h1>
+          <p>Consumo, gastos e cuidados reunidos em um só lugar.</p>
+        </div>
+        <div class="dashboard-controls">
+          <div class="control-group vehicle-control"><label for="vehicle-filter">Veículo</label><div class="control-row"><select id="vehicle-filter"></select><button class="square-button" id="manage-vehicle" type="button" aria-label="Gerenciar veículo">✎</button><button class="square-button" id="add-vehicle" type="button" aria-label="Adicionar veículo">＋</button></div></div>
+          <div class="control-group"><label for="period">Período</label><select id="period"><option value="all">Todo o período</option><option value="month">Este mês</option><option value="30">Últimos 30 dias</option><option value="year">Este ano</option></select></div>
+        </div>
+      </section>
+
+      <button class="reminder-banner" id="reminder-banner" type="button" hidden><span>!</span><div><strong id="reminder-title"></strong><small>Veja os próximos cuidados do veículo</small></div><b>→</b></button>
+
+      <section class="metrics" aria-label="Resumo">
+        <article class="metric featured"><span class="metric-icon">R$</span><div><p>Total gasto</p><strong id="total-spent">R$ 0,00</strong><small id="entry-count">Nenhum abastecimento</small></div></article>
+        <article class="metric"><span class="metric-icon">L</span><div><p>Volume abastecido</p><strong id="total-liters">0,00 L</strong><small>No período selecionado</small></div></article>
+        <article class="metric"><span class="metric-icon">≈</span><div><p>Preço médio geral</p><strong id="average-price">R$ 0,00/L</strong><small>Média ponderada por litro</small></div></article>
+        <article class="metric"><span class="metric-icon">km</span><div><p>Consumo médio</p><strong id="average-consumption">— km/L</strong><small id="cost-per-km">Informe o hodômetro</small></div></article>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel history-panel">
+          <div class="panel-heading"><div><p class="eyebrow">HISTÓRICO</p><h2>Abastecimentos</h2></div><select id="fuel-filter" aria-label="Filtrar por combustível"><option value="all">Todos os combustíveis</option><option>Gasolina</option><option>Etanol</option><option>Diesel</option><option>GNV</option><option>Outro</option></select></div>
+          <div id="entries" class="entries"></div>
+          <div id="empty-state" class="empty-state" hidden><span class="empty-icon">⛽</span><h3>Seu histórico começa aqui</h3><p>Registre o primeiro abastecimento para acompanhar seus gastos.</p><button class="primary" type="button" data-open-form>Adicionar abastecimento</button></div>
+        </article>
+        <aside class="panel insights-panel">
+          <div class="panel-heading"><div><p class="eyebrow">MÉDIAS E DISTRIBUIÇÃO</p><h2>Por combustível</h2></div></div>
+          <div id="fuel-chart" class="fuel-chart"></div>
+          <div class="tip"><span>✦</span><div><strong>Visão rápida</strong><p id="insight-text">Adicione registros para descobrir seu combustível mais usado.</p></div></div>
+        </aside>
+      </section>
+
+      <section class="analytics-grid">
+        <article class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">EVOLUÇÃO</p><h2>Gastos mensais</h2></div><span class="comparison" id="month-comparison">—</span></div>
+          <div class="monthly-chart" id="monthly-chart"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-heading"><div><p class="eyebrow">ONDE ABASTECER</p><h2>Análise de postos</h2></div></div>
+          <div class="station-list" id="station-list"></div>
+        </article>
+      </section>
+
+      <section class="panel maintenance-panel" id="maintenance-section">
+        <div class="panel-heading"><div><p class="eyebrow">CUIDADOS E DESPESAS</p><h2>Manutenção do veículo</h2></div><button class="primary secondary-tone" id="add-maintenance" type="button">＋ Adicionar</button></div>
+        <div id="maintenance-list" class="maintenance-list"></div>
+        <div id="maintenance-empty" class="empty-state compact" hidden><h3>Nenhuma manutenção registrada</h3><p>Registre serviços, impostos e próximos vencimentos.</p></div>
+      </section>
+
+      <section class="data-tools">
+        <div><p class="eyebrow">SEUS DADOS</p><h2>Leve seu histórico com você</h2><p>Exporte relatórios ou guarde uma cópia dos veículos, abastecimentos e manutenções.</p></div>
+        <div class="tool-actions"><button class="secondary" id="export-csv" type="button">Exportar CSV</button><button class="secondary" id="export-excel" type="button">Abrir no Excel</button><button class="secondary" id="download-backup" type="button">Baixar backup</button></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="entry-dialog"><form id="entry-form" method="dialog">
+    <div class="dialog-heading"><div><p class="eyebrow" id="form-eyebrow">NOVO REGISTRO</p><h2 id="form-title">Adicionar abastecimento</h2></div><button class="icon-button" data-close-dialog type="button" aria-label="Fechar">×</button></div>
+    <div class="form-grid">
+      <label class="full">Veículo<select name="vehicleId" id="entry-vehicle" required></select></label>
+      <label>Data<input id="date" name="date" type="date" required></label>
+      <label>Combustível<select name="fuelType" required><option>Gasolina</option><option>Etanol</option><option>Diesel</option><option>GNV</option><option>Outro</option></select></label>
+      <label>Quantidade (litros)<input name="liters" type="number" min="0.001" step="0.001" placeholder="Ex.: 42,5" required></label>
+      <label>Valor total (R$)<input name="amount" type="number" min="0.01" step="0.01" placeholder="Ex.: 245,90" required></label>
+      <label>Hodômetro (km)<input name="odometer" type="number" min="0" step="0.1" placeholder="Ex.: 58420"></label>
+      <label class="checkbox-label"><input name="fullTank" type="checkbox" checked><span><strong>Tanque completo</strong><small>Necessário para calcular km/L</small></span></label>
+      <label class="full">Posto <span>(opcional)</span><input name="station" maxlength="80" placeholder="Ex.: Posto Central"></label>
+      <label class="full">Observação <span>(opcional)</span><textarea name="notes" maxlength="240" rows="3" placeholder="Algo que queira lembrar?"></textarea></label>
+    </div><p id="form-error" class="form-error" role="alert"></p>
+    <div class="dialog-actions"><button class="secondary" data-close-dialog type="button">Cancelar</button><button class="primary" id="save-entry" type="submit">Salvar abastecimento</button></div>
+  </form></dialog>
+
+  <dialog id="vehicle-dialog"><form id="vehicle-form" method="dialog">
+    <div class="dialog-heading"><div><p class="eyebrow" id="vehicle-eyebrow">NOVO VEÍCULO</p><h2 id="vehicle-title">Adicionar veículo</h2></div><button class="icon-button" data-close-dialog type="button" aria-label="Fechar">×</button></div>
+    <div class="form-grid"><label class="full">Nome do veículo<input name="name" maxlength="60" placeholder="Ex.: Meu carro" required></label><label>Marca<input name="make" maxlength="50" placeholder="Ex.: Honda"></label><label>Modelo<input name="model" maxlength="60" placeholder="Ex.: Civic"></label><label>Placa<input name="plate" maxlength="10" placeholder="ABC1D23"></label><label>Combustível principal<select name="fuelType"><option>Gasolina</option><option>Etanol</option><option>Diesel</option><option>GNV</option><option>Outro</option></select></label></div>
+    <p id="vehicle-error" class="form-error" role="alert"></p><div class="dialog-actions"><button class="secondary" data-close-dialog type="button">Cancelar</button><button class="primary" type="submit">Salvar veículo</button></div>
+  </form></dialog>
+
+  <dialog id="maintenance-dialog"><form id="maintenance-form" method="dialog">
+    <div class="dialog-heading"><div><p class="eyebrow" id="maintenance-eyebrow">NOVO REGISTRO</p><h2 id="maintenance-title">Adicionar manutenção</h2></div><button class="icon-button" data-close-dialog type="button" aria-label="Fechar">×</button></div>
+    <div class="form-grid"><label class="full">Veículo<select name="vehicleId" id="maintenance-vehicle" required></select></label><label>Categoria<select name="category" required><option>Óleo e filtros</option><option>Pneus</option><option>Freios</option><option>Revisão</option><option>Seguro</option><option>Impostos</option><option>Lavagem</option><option>Estacionamento</option><option>Pedágio</option><option>Outro</option></select></label><label>Data<input name="date" type="date" required></label><label class="full">Descrição<input name="description" maxlength="100" placeholder="Ex.: Troca de óleo e filtro" required></label><label>Hodômetro (km)<input name="odometer" type="number" min="0" step="0.1"></label><label>Valor (R$)<input name="amount" type="number" min="0" step="0.01"></label><label>Próxima data<input name="nextDate" type="date"></label><label>Próxima quilometragem<input name="nextOdometer" type="number" min="0" step="0.1"></label><label class="full">Observação<textarea name="notes" maxlength="240" rows="2"></textarea></label></div>
+    <p id="maintenance-error" class="form-error" role="alert"></p><div class="dialog-actions"><button class="secondary" data-close-dialog type="button">Cancelar</button><button class="primary" type="submit">Salvar manutenção</button></div>
+  </form></dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/assets/app-v4.js" defer></script>
+</body>
+</html>
