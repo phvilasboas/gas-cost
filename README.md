@@ -14,7 +14,58 @@ O painel inclui:
 - exportação em CSV e Excel, além do backup dos dados em JSON;
 - instalação no celular ou computador como aplicativo, com atalho para um novo abastecimento.
 
-No primeiro acesso, a aplicação solicitará a criação da conta administradora. Depois disso, será necessário fazer login. Usuários, senhas protegidas e sessões ficam no banco SQLite `/app/data/auth.db`. Os veículos, abastecimentos e manutenções ficam no SQLite `/app/data/gascost.db`. Ambos permanecem no mesmo volume e no mesmo container.
+## MCP remoto somente leitura
+
+### Conectar pelo ChatGPT (OAuth)
+
+Depois de publicar esta versão, crie novamente a conexão no ChatGPT:
+
+- Server URL: `https://gascost.vilasboas.it/mcp`
+- Authentication: `OAuth`
+- Client ID e Client secret: **deixe vazios** (cadastro automático do cliente público com PKCE).
+- Authorization URL e Token URL: deixe vazios para descoberta automática.
+- Scopes, caso sejam solicitados: `gascost:fuel:read`, `gascost:maintenance:read` e `offline_access`, um por linha.
+
+O ChatGPT abre o login do GasCost. Entre com a conta desejada e aprove as permissões exibidas. O token pessoal não deve ser colocado no campo Client secret.
+
+A descoberta usa `/.well-known/oauth-authorization-server` e `/.well-known/oauth-protected-resource/mcp`. Os endpoints são `/oauth/authorize`, `/oauth/register`, `/oauth/token` e `/oauth/revoke`. O HAProxy deve encaminhar esses caminhos e `/.well-known/` à aplicação; configure a Cloudflare para respeitar `Cache-Control: no-store` nesses caminhos, em `/mcp` e `/api/`.
+
+Os códigos duram 2 minutos, exigem PKCE S256 e são de uso único. Tokens de acesso duram até 1 hora; com `offline_access`, tokens de renovação são rotacionados a cada uso, por até 90 dias. Reutilizar um código ou token de renovação revoga a conexão correspondente. Apenas hashes dos códigos e tokens são persistidos. A aprovação é vinculada à sessão do usuário e protegida contra CSRF. Cada usuário pode desconectar o ChatGPT em **Perfil e MCP → ChatGPT**, invalidando acesso e renovação imediatamente.
+
+O cadastro automático aceita somente retornos oficiais do ChatGPT, registrados com correspondência exata. Outros clientes continuam podendo usar os tokens pessoais descritos abaixo. Não há novo container ou serviço externo: os registros OAuth ficam no SQLite de autenticação existente. Faça backup do volume antes da atualização; a migração adiciona tabelas sem apagar os registros atuais.
+
+### Tokens pessoais para outros clientes
+
+O GasCost disponibiliza um servidor MCP Streamable HTTP em:
+
+```text
+https://gascost.vilasboas.it/mcp
+```
+
+Ele permite que clientes de IA consultem veículos, abastecimentos, resumos, ciclos de consumo, postos e manutenções. O MCP não possui ferramentas de criação, edição ou exclusão e não acessa senhas ou sessões.
+
+Cada usuário cria o próprio token em **Perfil e MCP**. O token é mostrado uma única vez, armazenado apenas como hash no SQLite e deve ser enviado pelo cliente MCP em todas as requisições:
+
+```text
+Authorization: Bearer SEU_TOKEN_PESSOAL
+```
+
+Nunca coloque o token na URL nem reutilize `BOOTSTRAP_TOKEN`, usuário ou senha do painel. Cada token possui validade, permissões selecionadas e revogação independente. As consultas são sempre limitadas aos veículos pertencentes ao usuário que criou o token.
+
+Ferramentas disponíveis:
+
+- `listar_veiculos`
+- `listar_abastecimentos`
+- `obter_resumo_combustivel`
+- `analisar_consumo`
+- `analisar_postos`
+- `listar_manutencoes`
+
+Cada consulta aceita somente parâmetros validados, possui limites de resultados e é registrada no log sem gravar o conteúdo retornado. As permissões podem liberar separadamente combustível/análises e manutenções.
+
+No primeiro acesso, a aplicação solicitará a criação da conta administradora. O administrador pode criar outros perfis em **Perfil e MCP**. Cada usuário possui dados e tokens MCP isolados. Usuários, senhas protegidas, sessões e hashes dos tokens ficam no SQLite `/app/data/auth.db`. Os veículos, abastecimentos e manutenções ficam no SQLite `/app/data/gascost.db`. Ambos permanecem no mesmo volume e no mesmo container.
+
+Na primeira inicialização desta versão, todos os dados preexistentes são atribuídos automaticamente à conta administradora mais antiga. Novos usuários recebem um veículo inicial vazio e não conseguem consultar, alterar ou exportar registros de outra conta.
 
 Ao iniciar a nova versão pela primeira vez, os abastecimentos que já existirem em `/app/data/fuel.json` serão importados automaticamente para o SQLite. O arquivo antigo é preservado e a importação não se repete.
 
@@ -53,7 +104,7 @@ Depois de criar a conta administradora, você pode apagar `BOOTSTRAP_TOKEN` do `
 
 ## Desenvolvimento local
 
-Requer Node.js 22.13 ou superior. Não é necessário instalar dependências.
+Requer Node.js 22.13 ou superior. Instale as dependências com `npm ci`.
 
 Para executar fora do container, as variáveis de produção devem ser ajustadas ou removidas, pois o domínio publicado e o cookie HTTPS não funcionam em uma URL HTTP local.
 

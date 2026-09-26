@@ -8,7 +8,7 @@
   <title>GasCost — Controle do veículo</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/assets/styles-v4.css">
+  <link rel="stylesheet" href="/assets/styles-v5.css">
 </head>
 <body>
   <div class="shell">
@@ -20,6 +20,7 @@
       <div class="top-actions">
         <button class="install-button" id="install-app" type="button" hidden>Instalar app</button>
         <span class="user-chip" id="current-user"></span>
+        <button class="logout-button" data-open-access type="button">Perfil</button>
         <button class="logout-button" id="logout" type="button">Sair</button>
         <button class="primary small" id="open-form" type="button"><span>＋</span> Novo abastecimento</button>
       </div>
@@ -79,7 +80,7 @@
 
       <section class="data-tools">
         <div><p class="eyebrow">SEUS DADOS</p><h2>Leve seu histórico com você</h2><p>Exporte relatórios ou guarde uma cópia dos veículos, abastecimentos e manutenções.</p></div>
-        <div class="tool-actions"><button class="secondary" id="export-csv" type="button">Exportar CSV</button><button class="secondary" id="export-excel" type="button">Abrir no Excel</button><button class="secondary" id="download-backup" type="button">Baixar backup</button></div>
+        <div class="tool-actions"><button class="secondary" data-open-access type="button">Perfil e MCP</button><button class="secondary" id="export-csv" type="button">Exportar CSV</button><button class="secondary" id="export-excel" type="button">Abrir no Excel</button><button class="secondary" id="download-backup" type="button">Baixar backup</button></div>
       </section>
     </main>
   </div>
@@ -113,8 +114,52 @@
     <p id="maintenance-error" class="form-error" role="alert"></p><div class="dialog-actions"><button class="secondary" data-close-dialog type="button">Cancelar</button><button class="primary" type="submit">Salvar manutenção</button></div>
   </form></dialog>
 
+  <dialog id="access-dialog" class="wide-dialog"><div class="access-dialog-content">
+    <div class="dialog-heading"><div><p class="eyebrow">PERFIL E INTEGRAÇÕES</p><h2>Seus acessos</h2></div><button class="icon-button" data-close-dialog type="button" aria-label="Fechar">×</button></div>
+
+    <section class="access-section">
+      <div class="section-copy"><h3>ChatGPT</h3><p>No ChatGPT, crie a conexão com https://gascost.vilasboas.it/mcp e autenticação OAuth. Deixe Client ID e Client secret vazios e entre com sua conta GasCost quando solicitado.</p></div>
+      <div id="oauth-connections" class="access-list"></div>
+    </section>
+
+    <section class="access-section">
+      <div class="section-copy"><h3>Conexões MCP</h3><p>Crie um token pessoal para conectar uma IA. Cada token acessa somente os seus dados e pode ser revogado a qualquer momento.</p></div>
+      <label class="endpoint-field">Endereço MCP<input id="mcp-endpoint" type="text" value="https://gascost.vilasboas.it/mcp" readonly></label>
+      <form id="mcp-token-form" class="access-form">
+        <div class="form-grid">
+          <label>Nome do acesso<input name="name" maxlength="60" placeholder="Ex.: Meu ChatGPT" required></label>
+          <label>Validade<select name="expiresInDays"><option value="90">90 dias</option><option value="180">180 dias</option><option value="365">1 ano</option></select></label>
+          <fieldset class="scope-fieldset full"><legend>Permissões</legend><label><input name="scopes" type="checkbox" value="gascost:fuel:read" checked> Veículos, abastecimentos e análises</label><label><input name="scopes" type="checkbox" value="gascost:maintenance:read" checked> Manutenções e lembretes</label></fieldset>
+        </div>
+        <p id="mcp-token-error" class="form-error" role="alert"></p>
+        <div class="dialog-actions"><button class="primary" type="submit">Criar token pessoal</button></div>
+      </form>
+      <div id="new-token" class="token-reveal" hidden><strong>Copie agora — o token não será exibido novamente.</strong><code id="new-token-value"></code><button class="secondary" id="copy-token" type="button">Copiar token</button></div>
+      <div id="mcp-token-list" class="access-list"></div>
+    </section>
+
+    <section class="access-section" id="user-management" hidden>
+      <div class="section-copy"><h3>Usuários</h3><p>Como administrador, você pode criar perfis independentes. Cada perfil recebe seu próprio veículo inicial e não enxerga os dados dos demais.</p></div>
+      <form id="user-form" class="access-form">
+        <div class="form-grid"><label>Usuário<input name="username" minlength="3" maxlength="40" autocomplete="off" required></label><label>Senha inicial<input name="password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required><small>O usuário poderá alterá-la no próprio perfil.</small></label></div>
+        <p id="user-error" class="form-error" role="alert"></p>
+        <div class="dialog-actions"><button class="primary" type="submit">Criar usuário</button></div>
+      </form>
+      <div id="user-list" class="access-list"></div>
+    </section>
+
+    <section class="access-section">
+      <div class="section-copy"><h3>Alterar senha</h3><p>Ao trocar a senha, todas as sessões abertas serão encerradas.</p></div>
+      <form id="password-form" class="access-form">
+        <div class="form-grid"><label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" required></label><label>Nova senha<input name="newPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password" required></label></div>
+        <p id="password-error" class="form-error" role="alert"></p>
+        <div class="dialog-actions"><button class="secondary" type="submit">Alterar senha</button></div>
+      </form>
+    </section>
+  </div></dialog>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="/assets/calculations-v2.js" defer></script>
-  <script src="/assets/app-v6.js" defer></script>
+  <script src="/assets/app-v8.js" defer></script>
 </body>
 </html>

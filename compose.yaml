@@ -12,6 +12,7 @@ services:
       EXPECTED_HOST: "gascost.vilasboas.it"
       TRUST_PROXY: "true"
       BOOTSTRAP_TOKEN: "${BOOTSTRAP_TOKEN:-}"
+      APP_TIMEZONE: "America/Sao_Paulo"
       UV_THREADPOOL_SIZE: "2"
     volumes:
       - gas-cost-data:/app/data

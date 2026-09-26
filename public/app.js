@@ -1,7 +1,8 @@
 const state = {
   vehicles: [], entries: [], maintenance: [], selectedVehicleId: '',
   period: 'all', fuel: 'all', editingId: null, editingVehicleId: null,
-  editingMaintenanceId: null, deferredInstall: null,
+  editingMaintenanceId: null, deferredInstall: null, currentUser: null,
+  mcpTokens: [], users: [], revealedToken: '',
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -43,6 +44,60 @@ function api(url, options = {}) {
     if (!response.ok) throw new Error(result.error || 'Não foi possível concluir a operação.');
     return result;
   });
+}
+
+const scopeLabels = {
+  'gascost:fuel:read': 'Combustível e análises',
+  'gascost:maintenance:read': 'Manutenções',
+};
+
+function formatAccessDate(timestamp) {
+  if (!timestamp) return 'Nunca usado';
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(timestamp * 1000));
+}
+
+function renderAccessPanel() {
+  $('#mcp-token-list').innerHTML = state.mcpTokens.length ? state.mcpTokens.map((token) => `<article class="access-row">
+    <div><strong>${escapeHtml(token.name)}</strong><small>${token.scopes.map((scope) => scopeLabels[scope] || scope).map(escapeHtml).join(' · ')}</small><small>Expira em ${formatAccessDate(token.expiresAt)} · ${token.lastUsedAt ? `Último uso: ${formatAccessDate(token.lastUsedAt)}` : 'Ainda não utilizado'}</small></div>
+    <button class="delete-button revoke-token" data-token-id="${token.id}" type="button">Revogar</button>
+  </article>`).join('') : '<p class="muted-copy access-empty">Nenhuma conexão MCP pessoal criada.</p>';
+
+  if (state.currentUser?.role === 'admin') {
+    $('#user-management').hidden = false;
+    $('#user-list').innerHTML = state.users.map((user) => `<article class="access-row"><div><strong>${escapeHtml(user.username)}</strong><small>${user.role === 'admin' ? 'Administrador' : 'Usuário'} · criado em ${formatAccessDate(Math.floor(user.createdAt / 1000))}</small></div></article>`).join('');
+  } else {
+    $('#user-management').hidden = true;
+  }
+}
+
+async function openAccessPanel() {
+  try {
+    await loadOAuthConnections();
+    const requests = [api('/api/mcp-tokens')];
+    if (state.currentUser?.role === 'admin') requests.push(api('/api/users'));
+    const [tokens, users = []] = await Promise.all(requests);
+    state.mcpTokens = tokens; state.users = users; state.revealedToken = '';
+    $('#new-token').hidden = true; $('#new-token-value').textContent = '';
+    renderAccessPanel(); $('#access-dialog').showModal();
+  } catch (error) { toast(error.message); }
+}
+
+async function loadOAuthConnections() {
+  const connections = await api('/api/oauth-connections');
+  $('#oauth-connections').replaceChildren(...connections.map((connection) => {
+    const row = document.createElement('article'); row.className = 'access-row';
+    const description = document.createElement('div');
+    const title = document.createElement('strong'); title.textContent = 'ChatGPT';
+    const detail = document.createElement('small'); detail.textContent = `${connection.scopes.split(' ').map((s) => scopeLabels[s] || 'Renovação automática').join(' · ')} · Expira em ${formatAccessDate(connection.expires)}`;
+    description.append(title, detail);
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'delete-button'; button.textContent = 'Desconectar';
+    button.addEventListener('click', async () => {
+      try { await api(`/api/oauth-connections/${connection.id}`, { method: 'DELETE' }); await loadOAuthConnections(); toast('ChatGPT desconectado.'); }
+      catch (error) { toast(error.message); }
+    });
+    row.append(description, button); return row;
+  }));
+  if (!connections.length) $('#oauth-connections').textContent = 'Nenhuma conta ChatGPT conectada.';
 }
 
 function render() {
@@ -280,6 +335,54 @@ $('#download-backup').addEventListener('click', async () => {
   try { const backup = await api('/api/backup'); download(JSON.stringify(backup, null, 2), 'application/json', `gascost-backup-${localDate()}.json`); toast('Backup completo preparado.'); } catch (error) { toast(error.message); }
 });
 
+document.querySelectorAll('[data-open-access]').forEach((button) => button.addEventListener('click', openAccessPanel));
+$('#mcp-token-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget; const data = Object.fromEntries(new FormData(form));
+  data.scopes = [...form.querySelectorAll('[name="scopes"]:checked')].map((input) => input.value);
+  data.expiresInDays = Number(data.expiresInDays);
+  $('#mcp-token-error').textContent = '';
+  try {
+    const created = await api('/api/mcp-tokens', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    state.revealedToken = created.token; $('#new-token-value').textContent = created.token; $('#new-token').hidden = false;
+    state.mcpTokens = await api('/api/mcp-tokens'); renderAccessPanel(); form.reset();
+    form.querySelectorAll('[name="scopes"]').forEach((input) => { input.checked = true; });
+  } catch (error) { $('#mcp-token-error').textContent = error.message; }
+});
+
+$('#copy-token').addEventListener('click', async () => {
+  if (!state.revealedToken) return;
+  try { await navigator.clipboard.writeText(state.revealedToken); toast('Token copiado.'); }
+  catch { toast('Não foi possível copiar automaticamente. Selecione o token acima.'); }
+});
+
+$('#mcp-token-list').addEventListener('click', async (event) => {
+  const button = event.target.closest('.revoke-token'); if (!button) return;
+  if (!confirm('Revogar esta conexão MCP agora?')) return;
+  try {
+    await api(`/api/mcp-tokens/${button.dataset.tokenId}`, { method: 'DELETE' });
+    state.mcpTokens = await api('/api/mcp-tokens'); renderAccessPanel(); toast('Acesso MCP revogado.');
+  } catch (error) { toast(error.message); }
+});
+
+$('#user-form').addEventListener('submit', async (event) => {
+  event.preventDefault(); const form = event.currentTarget; const data = Object.fromEntries(new FormData(form));
+  $('#user-error').textContent = '';
+  try {
+    await api('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    state.users = await api('/api/users'); renderAccessPanel(); form.reset(); toast('Usuário criado com dados separados.');
+  } catch (error) { $('#user-error').textContent = error.message; }
+});
+
+$('#password-form').addEventListener('submit', async (event) => {
+  event.preventDefault(); const form = event.currentTarget; const data = Object.fromEntries(new FormData(form));
+  $('#password-error').textContent = '';
+  try {
+    await api('/api/profile/password', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    location.replace('/');
+  } catch (error) { $('#password-error').textContent = error.message; }
+});
+
 $('#vehicle-filter').addEventListener('change', (event) => { state.selectedVehicleId = event.target.value; localStorage.setItem('gascost.vehicle', state.selectedVehicleId); fillVehicleSelectors(); render(); });
 $('#period').addEventListener('change', (event) => { state.period = event.target.value; render(); });
 $('#fuel-filter').addEventListener('change', (event) => { state.fuel = event.target.value; render(); });
@@ -291,6 +394,7 @@ $('#add-maintenance').addEventListener('click', () => openMaintenanceForm());
 $('#reminder-banner').addEventListener('click', () => $('#maintenance-section').scrollIntoView({ behavior: 'smooth' }));
 document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => closeDialog(button.closest('dialog'))));
 document.querySelectorAll('dialog').forEach((dialog) => dialog.addEventListener('click', (event) => { if (event.target === dialog) closeDialog(dialog); }));
+$('#access-dialog').addEventListener('close', () => { state.revealedToken = ''; $('#new-token-value').textContent = ''; $('#new-token').hidden = true; });
 $('#logout').addEventListener('click', async () => { try { await api('/api/auth/logout', { method: 'POST' }); } finally { location.replace('/'); } });
 
 window.addEventListener('beforeinstallprompt', (event) => { event.preventDefault(); state.deferredInstall = event; $('#install-app').hidden = false; });
@@ -299,7 +403,7 @@ window.addEventListener('appinstalled', () => { state.deferredInstall = null; $(
 
 async function initialize() {
   try {
-    const status = await api('/api/auth/status'); if (!status.authenticated) return location.replace('/'); $('#current-user').textContent = status.user.username;
+    const status = await api('/api/auth/status'); if (!status.authenticated) return location.replace('/'); state.currentUser = status.user; $('#current-user').textContent = status.user.username;
     [state.vehicles, state.entries, state.maintenance] = await Promise.all([api('/api/vehicles'), api('/api/entries'), api('/api/maintenance')]);
     const saved = localStorage.getItem('gascost.vehicle'); state.selectedVehicleId = state.vehicles.some((vehicle) => vehicle.id === saved) ? saved : state.vehicles[0]?.id || '';
     fillVehicleSelectors(); render();

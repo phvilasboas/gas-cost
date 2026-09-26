@@ -71,7 +71,7 @@ class FuelStore {
     this.db.exec(`
       PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;
       CREATE TABLE IF NOT EXISTS app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS vehicles (id TEXT PRIMARY KEY, name TEXT NOT NULL, make TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', plate TEXT NOT NULL DEFAULT '', fuel_type TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT);
+      CREATE TABLE IF NOT EXISTS vehicles (id TEXT PRIMARY KEY, user_id INTEGER, name TEXT NOT NULL, make TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', plate TEXT NOT NULL DEFAULT '', fuel_type TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT);
       CREATE TABLE IF NOT EXISTS fuel_entries (id TEXT PRIMARY KEY, vehicle_id TEXT NOT NULL REFERENCES vehicles(id) ON DELETE RESTRICT, date TEXT NOT NULL, time TEXT NOT NULL DEFAULT '', fuel_type TEXT NOT NULL, liters REAL NOT NULL, amount REAL NOT NULL, station TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', odometer REAL, full_tank INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT);
       CREATE TABLE IF NOT EXISTS maintenance (id TEXT PRIMARY KEY, vehicle_id TEXT NOT NULL REFERENCES vehicles(id) ON DELETE RESTRICT, category TEXT NOT NULL, description TEXT NOT NULL, date TEXT NOT NULL, odometer REAL, amount REAL, next_date TEXT NOT NULL DEFAULT '', next_odometer REAL, notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT);
       CREATE INDEX IF NOT EXISTS idx_fuel_vehicle_date ON fuel_entries(vehicle_id, date DESC);
@@ -79,18 +79,35 @@ class FuelStore {
       CREATE INDEX IF NOT EXISTS idx_maintenance_next_date ON maintenance(next_date) WHERE next_date != '';
       PRAGMA optimize;
     `);
+    const vehicleColumns = this.db.prepare('PRAGMA table_info(vehicles)').all();
+    if (!vehicleColumns.some((column) => column.name === 'user_id')) this.db.exec('ALTER TABLE vehicles ADD COLUMN user_id INTEGER');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_vehicles_user ON vehicles(user_id, created_at)');
     const fuelColumns = this.db.prepare('PRAGMA table_info(fuel_entries)').all();
     if (!fuelColumns.some((column) => column.name === 'time')) this.db.exec("ALTER TABLE fuel_entries ADD COLUMN time TEXT NOT NULL DEFAULT ''");
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_fuel_vehicle_datetime ON fuel_entries(vehicle_id, date DESC, time DESC)');
-    const defaultVehicle = this.ensureDefaultVehicle();
-    await this.migrateLegacyJson(defaultVehicle.id);
   }
 
-  ensureDefaultVehicle() {
-    let row = this.db.prepare('SELECT * FROM vehicles ORDER BY created_at LIMIT 1').get();
+  validUserId(userId) {
+    const value = Number(userId);
+    if (!Number.isInteger(value) || value <= 0) throw new Error('Usuário inválido.');
+    return value;
+  }
+
+  async initializeUser(userId, { claimUnowned = false } = {}) {
+    const ownerId = this.validUserId(userId);
+    if (claimUnowned) this.db.prepare('UPDATE vehicles SET user_id = ? WHERE user_id IS NULL').run(ownerId);
+    const defaultVehicle = this.ensureDefaultVehicle(ownerId);
+    if (claimUnowned) await this.migrateLegacyJson(defaultVehicle.id);
+    return defaultVehicle;
+  }
+
+  ensureDefaultVehicle(userId) {
+    const ownerId = this.validUserId(userId);
+    let row = this.db.prepare('SELECT * FROM vehicles WHERE user_id = ? ORDER BY created_at LIMIT 1').get(ownerId);
     if (!row) {
       const id = crypto.randomUUID();
-      this.db.prepare('INSERT INTO vehicles (id, name, fuel_type, created_at) VALUES (?, ?, ?, ?)').run(id, 'Meu veículo', 'Gasolina', new Date().toISOString());
+      this.db.prepare('INSERT INTO vehicles (id, user_id, name, fuel_type, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run(id, ownerId, 'Meu veículo', 'Gasolina', new Date().toISOString());
       row = this.db.prepare('SELECT * FROM vehicles WHERE id = ?').get(id);
     }
     return this.mapVehicle(row);
@@ -115,68 +132,88 @@ class FuelStore {
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
 
-  vehicleExists(id) { return Boolean(this.db.prepare('SELECT 1 FROM vehicles WHERE id = ?').get(id)); }
-  listVehicles() { return this.db.prepare('SELECT * FROM vehicles ORDER BY created_at').all().map((row) => this.mapVehicle(row)); }
-  getVehicle(id) { const row = this.db.prepare('SELECT * FROM vehicles WHERE id = ?').get(id); return row ? this.mapVehicle(row) : null; }
+  vehicleExists(userId, id) { return Boolean(this.db.prepare('SELECT 1 FROM vehicles WHERE id = ? AND user_id = ?').get(id, this.validUserId(userId))); }
+  listVehicles(userId) { return this.db.prepare('SELECT * FROM vehicles WHERE user_id = ? ORDER BY created_at').all(this.validUserId(userId)).map((row) => this.mapVehicle(row)); }
+  getVehicle(userId, id) { const row = this.db.prepare('SELECT * FROM vehicles WHERE id = ? AND user_id = ?').get(id, this.validUserId(userId)); return row ? this.mapVehicle(row) : null; }
   mapVehicle(row) { return { id: row.id, name: row.name, make: row.make, model: row.model, plate: row.plate, fuelType: row.fuel_type, createdAt: row.created_at, updatedAt: row.updated_at }; }
 
-  createVehicle(input) {
+  createVehicle(userId, input) {
+    const ownerId = this.validUserId(userId);
     const valid = validateVehicle(input); const id = crypto.randomUUID(); const now = new Date().toISOString();
-    this.db.prepare('INSERT INTO vehicles (id, name, make, model, plate, fuel_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, valid.name, valid.make, valid.model, valid.plate, valid.fuelType, now);
-    return this.getVehicle(id);
+    this.db.prepare('INSERT INTO vehicles (id, user_id, name, make, model, plate, fuel_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(id, ownerId, valid.name, valid.make, valid.model, valid.plate, valid.fuelType, now);
+    return this.getVehicle(ownerId, id);
   }
-  updateVehicle(id, input) {
-    if (!this.vehicleExists(id)) return null;
+  updateVehicle(userId, id, input) {
+    const ownerId = this.validUserId(userId);
+    if (!this.vehicleExists(ownerId, id)) return null;
     const valid = validateVehicle(input);
-    this.db.prepare('UPDATE vehicles SET name=?, make=?, model=?, plate=?, fuel_type=?, updated_at=? WHERE id=?').run(valid.name, valid.make, valid.model, valid.plate, valid.fuelType, new Date().toISOString(), id);
-    return this.getVehicle(id);
+    this.db.prepare('UPDATE vehicles SET name=?, make=?, model=?, plate=?, fuel_type=?, updated_at=? WHERE id=? AND user_id=?').run(valid.name, valid.make, valid.model, valid.plate, valid.fuelType, new Date().toISOString(), id, ownerId);
+    return this.getVehicle(ownerId, id);
   }
 
-  list(vehicleId = '') {
-    const rows = vehicleId ? this.db.prepare('SELECT * FROM fuel_entries WHERE vehicle_id = ? ORDER BY date DESC, time DESC, created_at DESC').all(vehicleId) : this.db.prepare('SELECT * FROM fuel_entries ORDER BY date DESC, time DESC, created_at DESC').all();
+  list(userId, vehicleId = '') {
+    const ownerId = this.validUserId(userId);
+    const rows = vehicleId
+      ? this.db.prepare(`SELECT e.* FROM fuel_entries e JOIN vehicles v ON v.id = e.vehicle_id
+          WHERE e.vehicle_id = ? AND v.user_id = ? ORDER BY e.date DESC, e.time DESC, e.created_at DESC`).all(vehicleId, ownerId)
+      : this.db.prepare(`SELECT e.* FROM fuel_entries e JOIN vehicles v ON v.id = e.vehicle_id
+          WHERE v.user_id = ? ORDER BY e.date DESC, e.time DESC, e.created_at DESC`).all(ownerId);
     return rows.map((row) => this.mapEntry(row));
   }
-  getEntry(id) { const row = this.db.prepare('SELECT * FROM fuel_entries WHERE id = ?').get(id); return row ? this.mapEntry(row) : null; }
+  getEntry(userId, id) { const row = this.db.prepare(`SELECT e.* FROM fuel_entries e JOIN vehicles v ON v.id = e.vehicle_id
+    WHERE e.id = ? AND v.user_id = ?`).get(id, this.validUserId(userId)); return row ? this.mapEntry(row) : null; }
   mapEntry(row) { return { id: row.id, vehicleId: row.vehicle_id, date: row.date, time: row.time || '', fuelType: row.fuel_type, liters: row.liters, amount: row.amount, station: row.station, notes: row.notes, odometer: row.odometer, fullTank: row.full_tank === 1, createdAt: row.created_at, updatedAt: row.updated_at }; }
-  create(input) {
-    const valid = validateEntry(input); if (!this.vehicleExists(valid.vehicleId)) throw new Error('Veículo não encontrado.');
+  create(userId, input) {
+    const ownerId = this.validUserId(userId);
+    const valid = validateEntry(input); if (!this.vehicleExists(ownerId, valid.vehicleId)) throw new Error('Veículo não encontrado.');
     const id = crypto.randomUUID(); const now = new Date().toISOString();
     this.db.prepare(`INSERT INTO fuel_entries (id, vehicle_id, date, time, fuel_type, liters, amount, station, notes, odometer, full_tank, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(id, valid.vehicleId, valid.date, valid.time, valid.fuelType, valid.liters, valid.amount, valid.station, valid.notes, valid.odometer, valid.fullTank ? 1 : 0, now);
-    return this.getEntry(id);
+    return this.getEntry(ownerId, id);
   }
-  update(id, input) {
-    if (!this.getEntry(id)) return null;
-    const valid = validateEntry(input); if (!this.vehicleExists(valid.vehicleId)) throw new Error('Veículo não encontrado.');
+  update(userId, id, input) {
+    const ownerId = this.validUserId(userId);
+    if (!this.getEntry(ownerId, id)) return null;
+    const valid = validateEntry(input); if (!this.vehicleExists(ownerId, valid.vehicleId)) throw new Error('Veículo não encontrado.');
     this.db.prepare(`UPDATE fuel_entries SET vehicle_id=?, date=?, time=?, fuel_type=?, liters=?, amount=?, station=?, notes=?, odometer=?, full_tank=?, updated_at=? WHERE id=?`)
       .run(valid.vehicleId, valid.date, valid.time, valid.fuelType, valid.liters, valid.amount, valid.station, valid.notes, valid.odometer, valid.fullTank ? 1 : 0, new Date().toISOString(), id);
-    return this.getEntry(id);
+    return this.getEntry(ownerId, id);
   }
-  remove(id) { return this.db.prepare('DELETE FROM fuel_entries WHERE id = ?').run(id).changes > 0; }
+  remove(userId, id) { return this.db.prepare(`DELETE FROM fuel_entries WHERE id = ?
+    AND vehicle_id IN (SELECT id FROM vehicles WHERE user_id = ?)`).run(id, this.validUserId(userId)).changes > 0; }
 
-  listMaintenance(vehicleId = '') {
-    const rows = vehicleId ? this.db.prepare('SELECT * FROM maintenance WHERE vehicle_id = ? ORDER BY date DESC, created_at DESC').all(vehicleId) : this.db.prepare('SELECT * FROM maintenance ORDER BY date DESC, created_at DESC').all();
+  listMaintenance(userId, vehicleId = '') {
+    const ownerId = this.validUserId(userId);
+    const rows = vehicleId
+      ? this.db.prepare(`SELECT m.* FROM maintenance m JOIN vehicles v ON v.id = m.vehicle_id
+          WHERE m.vehicle_id = ? AND v.user_id = ? ORDER BY m.date DESC, m.created_at DESC`).all(vehicleId, ownerId)
+      : this.db.prepare(`SELECT m.* FROM maintenance m JOIN vehicles v ON v.id = m.vehicle_id
+          WHERE v.user_id = ? ORDER BY m.date DESC, m.created_at DESC`).all(ownerId);
     return rows.map((row) => this.mapMaintenance(row));
   }
-  getMaintenance(id) { const row = this.db.prepare('SELECT * FROM maintenance WHERE id = ?').get(id); return row ? this.mapMaintenance(row) : null; }
+  getMaintenance(userId, id) { const row = this.db.prepare(`SELECT m.* FROM maintenance m JOIN vehicles v ON v.id = m.vehicle_id
+    WHERE m.id = ? AND v.user_id = ?`).get(id, this.validUserId(userId)); return row ? this.mapMaintenance(row) : null; }
   mapMaintenance(row) { return { id: row.id, vehicleId: row.vehicle_id, category: row.category, description: row.description, date: row.date, odometer: row.odometer, amount: row.amount, nextDate: row.next_date, nextOdometer: row.next_odometer, notes: row.notes, createdAt: row.created_at, updatedAt: row.updated_at }; }
-  createMaintenance(input) {
-    const valid = validateMaintenance(input); if (!this.vehicleExists(valid.vehicleId)) throw new Error('Veículo não encontrado.');
+  createMaintenance(userId, input) {
+    const ownerId = this.validUserId(userId);
+    const valid = validateMaintenance(input); if (!this.vehicleExists(ownerId, valid.vehicleId)) throw new Error('Veículo não encontrado.');
     const id = crypto.randomUUID(); const now = new Date().toISOString();
     this.db.prepare(`INSERT INTO maintenance (id, vehicle_id, category, description, date, odometer, amount, next_date, next_odometer, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(id, valid.vehicleId, valid.category, valid.description, valid.date, valid.odometer, valid.amount, valid.nextDate, valid.nextOdometer, valid.notes, now);
-    return this.getMaintenance(id);
+    return this.getMaintenance(ownerId, id);
   }
-  updateMaintenance(id, input) {
-    if (!this.getMaintenance(id)) return null;
-    const valid = validateMaintenance(input); if (!this.vehicleExists(valid.vehicleId)) throw new Error('Veículo não encontrado.');
+  updateMaintenance(userId, id, input) {
+    const ownerId = this.validUserId(userId);
+    if (!this.getMaintenance(ownerId, id)) return null;
+    const valid = validateMaintenance(input); if (!this.vehicleExists(ownerId, valid.vehicleId)) throw new Error('Veículo não encontrado.');
     this.db.prepare(`UPDATE maintenance SET vehicle_id=?, category=?, description=?, date=?, odometer=?, amount=?, next_date=?, next_odometer=?, notes=?, updated_at=? WHERE id=?`)
       .run(valid.vehicleId, valid.category, valid.description, valid.date, valid.odometer, valid.amount, valid.nextDate, valid.nextOdometer, valid.notes, new Date().toISOString(), id);
-    return this.getMaintenance(id);
+    return this.getMaintenance(ownerId, id);
   }
-  removeMaintenance(id) { return this.db.prepare('DELETE FROM maintenance WHERE id = ?').run(id).changes > 0; }
+  removeMaintenance(userId, id) { return this.db.prepare(`DELETE FROM maintenance WHERE id = ?
+    AND vehicle_id IN (SELECT id FROM vehicles WHERE user_id = ?)`).run(id, this.validUserId(userId)).changes > 0; }
 
-  backup() { return { version: 1, exportedAt: new Date().toISOString(), vehicles: this.listVehicles(), fuelEntries: this.list(), maintenance: this.listMaintenance() }; }
+  backup(userId) { return { version: 2, exportedAt: new Date().toISOString(), vehicles: this.listVehicles(userId), fuelEntries: this.list(userId), maintenance: this.listMaintenance(userId) }; }
   close() { if (this.db) this.db.close(); }
 }
 

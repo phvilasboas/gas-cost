@@ -152,6 +152,29 @@ dialog form { padding: 28px; }
 .data-tools div > p:last-child { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
 .tool-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .tool-actions button { white-space: nowrap; }
+.wide-dialog { width: min(780px, calc(100% - 28px)); max-height: min(880px, calc(100vh - 28px)); }
+.access-dialog-content { padding: 28px; }
+.access-section { padding: 24px 0; border-top: 1px solid var(--line); }
+.access-section:first-of-type { padding-top: 0; border-top: 0; }
+.section-copy h3 { margin: 0; font-family: Georgia, serif; font-size: 20px; }
+.section-copy p { margin: 6px 0 18px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.endpoint-field { display: block; margin-bottom: 18px; color: #39453e; font-size: 12px; font-weight: 750; }
+.endpoint-field input { margin-top: 7px; color: var(--muted); background: #efede6; }
+.access-dialog-content .access-form { padding: 0; }
+.scope-fieldset { display: flex; flex-wrap: wrap; gap: 12px 22px; margin: 0; padding: 13px 15px; border: 1px solid var(--line); border-radius: 10px; }
+.scope-fieldset legend { padding: 0 5px; color: #39453e; font-size: 12px; font-weight: 750; }
+.scope-fieldset label { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.scope-fieldset input { width: 18px; height: 18px; margin: 0; accent-color: var(--green); }
+.token-reveal { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin: 18px 0; padding: 15px; border: 1px solid #b7c9ba; border-radius: 11px; background: #eef4ee; }
+.token-reveal strong { grid-column: 1 / -1; color: var(--green); font-size: 12px; }
+.token-reveal code { min-width: 0; padding: 10px; overflow-wrap: anywhere; border-radius: 7px; background: white; font-size: 11px; user-select: all; }
+.access-list { display: grid; gap: 8px; margin-top: 17px; }
+.access-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; background: #faf9f4; }
+.access-row div { display: grid; gap: 4px; min-width: 0; }
+.access-row strong { font-size: 13px; }
+.access-row small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.access-row .delete-button { width: auto; padding: 7px 9px; border-radius: 7px; font-size: 11px; font-weight: 750; opacity: .75; }
+.access-empty { padding: 15px; text-align: center; }
 .auth-body { min-height: 100vh; }
 .auth-layout { min-height: 100vh; display: grid; grid-template-columns: minmax(360px, .9fr) minmax(480px, 1.1fr); }
 .auth-story { display: flex; flex-direction: column; justify-content: space-between; padding: 48px clamp(36px, 6vw, 88px); color: white; background: var(--green); }
@@ -174,4 +197,4 @@ dialog form { padding: 28px; }
 @media (max-width: 800px) { .auth-layout { grid-template-columns: 1fr; } .auth-story { min-height: 310px; padding: 30px 24px; } .auth-story h1 { font-size: 43px; } .auth-story > small { display: none; } .auth-panel { padding: 45px 24px; } }
 @media (max-width: 1080px) { .metrics { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 900px) { .content-grid, .analytics-grid { grid-template-columns: 1fr; } .intro { align-items: flex-start; flex-direction: column; } .dashboard-controls { width: 100%; } .vehicle-control { flex: 1; } }
-@media (max-width: 620px) { .shell { padding: 0 16px 28px; } .topbar { height: 72px; } .user-chip, .install-button { display: none; } .primary.small { font-size: 0; } .primary.small span { font-size: 18px; } .intro { display: block; padding-top: 35px; } .dashboard-controls { display: grid; grid-template-columns: 1fr; margin-top: 24px; } .control-group, .vehicle-control { min-width: 0; } .metrics { grid-template-columns: 1fr; } .metric { min-height: 112px; } .panel-heading { align-items: flex-start; padding: 21px 18px 17px; } .panel-heading select { min-width: 0; width: 150px; } .entries, .maintenance-list { padding: 0 18px; } .entry { grid-template-columns: 40px minmax(0, 1fr) 66px; } .entry-number { grid-column: 2; text-align: left; display: flex; gap: 10px; } .entry-number:nth-of-type(2) { display: none; } .entry-actions { grid-column: 3; grid-row: 1; } .maintenance-item { grid-template-columns: 38px 1fr 62px; } .maintenance-item > b { grid-column: 2; } .maintenance-item .status-badge { grid-column: 2; width: max-content; } .maintenance-item .entry-actions { grid-column: 3; grid-row: 1; } .form-grid { grid-template-columns: 1fr; } .full { grid-column: auto; } dialog form { padding: 22px; } .monthly-chart { gap: 7px; padding-inline: 16px; } .month-column strong { display: none; } .data-tools { display: block; } .tool-actions { justify-content: flex-start; margin-top: 18px; } .tool-actions button { flex: 1; } }
+@media (max-width: 620px) { .shell { padding: 0 16px 28px; } .topbar { height: 72px; } .user-chip, .install-button { display: none; } .primary.small { font-size: 0; } .primary.small span { font-size: 18px; } .intro { display: block; padding-top: 35px; } .dashboard-controls { display: grid; grid-template-columns: 1fr; margin-top: 24px; } .control-group, .vehicle-control { min-width: 0; } .metrics { grid-template-columns: 1fr; } .metric { min-height: 112px; } .panel-heading { align-items: flex-start; padding: 21px 18px 17px; } .panel-heading select { min-width: 0; width: 150px; } .entries, .maintenance-list { padding: 0 18px; } .entry { grid-template-columns: 40px minmax(0, 1fr) 66px; } .entry-number { grid-column: 2; text-align: left; display: flex; gap: 10px; } .entry-number:nth-of-type(2) { display: none; } .entry-actions { grid-column: 3; grid-row: 1; } .maintenance-item { grid-template-columns: 38px 1fr 62px; } .maintenance-item > b { grid-column: 2; } .maintenance-item .status-badge { grid-column: 2; width: max-content; } .maintenance-item .entry-actions { grid-column: 3; grid-row: 1; } .form-grid { grid-template-columns: 1fr; } .full { grid-column: auto; } dialog form { padding: 22px; } .access-dialog-content { padding: 22px; } .access-dialog-content .access-form { padding: 0; } .scope-fieldset { display: grid; } .token-reveal { grid-template-columns: 1fr; } .token-reveal strong { grid-column: auto; } .monthly-chart { gap: 7px; padding-inline: 16px; } .month-column strong { display: none; } .data-tools { display: block; } .tool-actions { justify-content: flex-start; margin-top: 18px; } .tool-actions button { flex: 1; } }

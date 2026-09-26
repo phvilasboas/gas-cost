@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Conectar ChatGPT — GasCost</title><link rel="stylesheet" href="/assets/styles-v5.css"><script src="/oauth.js" defer></script></head>
+<body class="auth-body"><main class="auth-panel" style="min-height:100vh"><div class="auth-card">
+  <p class="eyebrow">GASCOST · CONEXÃO PESSOAL</p><h2>Conectar ao ChatGPT</h2>
+  <p id="loading">Verificando conexão…</p>
+  <form id="login" hidden><p>Entre na conta GasCost que deseja conectar.</p>
+    <label>Usuário<input name="username" autocomplete="username" maxlength="40" required></label>
+    <label>Senha<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
+    <button class="primary auth-submit" type="submit">Entrar</button>
+  </form>
+  <section id="consent" hidden><p>Conta: <strong id="account"></strong></p><p>Você autoriza o ChatGPT a consultar os seguintes dados desta conta:</p>
+    <ul id="scopes"></ul><p>O acesso é somente leitura e pode ser revogado em Perfil e MCP. A conexão dura até 90 dias.</p>
+    <div class="dialog-actions"><button class="secondary" id="deny" type="button">Cancelar</button><button class="primary" id="allow" type="button">Autorizar</button></div>
+    <button class="logout-button" id="switch-account" type="button">Entrar com outra conta</button>
+  </section>
+  <p id="error" class="form-error" role="alert"></p>
+</div></main></body></html>
