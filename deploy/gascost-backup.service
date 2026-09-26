@@ -1,0 +1,14 @@
+[Unit]
+Description=Backup dos bancos e aplicação GasCost
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+Environment=PROJECT_DIR=/opt/projetos/gas-cost
+Environment=BACKUP_DIR=/var/backups/gas-cost
+Environment=RETENTION_DAYS=30
+ExecStart=/usr/bin/bash /opt/projetos/gas-cost/deploy/backup.sh
+TimeoutStartSec=1h

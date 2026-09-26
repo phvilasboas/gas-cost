@@ -71,6 +71,8 @@ Ao iniciar a nova versão pela primeira vez, os abastecimentos que já existirem
 
 ## Executar com Docker
 
+Backup automático diário no host, com retenção de 30 dias: veja [instalação, verificação e restauração](deploy/BACKUP.md). O agendamento precisa ser instalado uma vez no RESAN depois de sincronizar o projeto.
+
 Crie o token usado somente para proteger a configuração da primeira conta:
 
 ```bash
