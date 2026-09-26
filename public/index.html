@@ -89,6 +89,7 @@
     <div class="form-grid">
       <label class="full">Veículo<select name="vehicleId" id="entry-vehicle" required></select></label>
       <label>Data<input id="date" name="date" type="date" required></label>
+      <label>Hora <span>(opcional)</span><input name="time" type="time" step="60"><small>Use para ordenar abastecimentos do mesmo dia</small></label>
       <label>Combustível<select name="fuelType" required><option>Gasolina</option><option>Etanol</option><option>Diesel</option><option>GNV</option><option>Outro</option></select></label>
       <label>Quantidade (litros)<input name="liters" type="number" min="0.001" step="0.001" placeholder="Ex.: 42,5" required></label>
       <label>Valor total (R$)<input name="amount" type="number" min="0.01" step="0.01" placeholder="Ex.: 245,90" required></label>
@@ -113,6 +114,7 @@
   </form></dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/app-v4.js" defer></script>
+  <script src="/assets/calculations-v2.js" defer></script>
+  <script src="/assets/app-v6.js" defer></script>
 </body>
 </html>

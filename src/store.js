@@ -13,6 +13,13 @@ function validDate(value, required = true) {
   return date;
 }
 
+function validTime(value) {
+  const time = String(value || '').trim();
+  if (!time) return '';
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('Informe uma hora válida.');
+  return time;
+}
+
 function optionalNumber(value, label) {
   if (value === '' || value === null || value === undefined) return null;
   const number = Number(value);
@@ -22,7 +29,7 @@ function optionalNumber(value, label) {
 
 function validateEntry(input) {
   const entry = {
-    vehicleId: String(input.vehicleId || ''), date: validDate(input.date), fuelType: String(input.fuelType || ''),
+    vehicleId: String(input.vehicleId || ''), date: validDate(input.date), time: validTime(input.time), fuelType: String(input.fuelType || ''),
     liters: Number(input.liters), amount: Number(input.amount), station: String(input.station || '').trim().slice(0, 80),
     notes: String(input.notes || '').trim().slice(0, 240), odometer: optionalNumber(input.odometer, 'uma quilometragem'),
     fullTank: input.fullTank === true || input.fullTank === 'true' || input.fullTank === 'on' || input.fullTank === 1,
@@ -65,13 +72,16 @@ class FuelStore {
       PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;
       CREATE TABLE IF NOT EXISTS app_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS vehicles (id TEXT PRIMARY KEY, name TEXT NOT NULL, make TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', plate TEXT NOT NULL DEFAULT '', fuel_type TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT);
-      CREATE TABLE IF NOT EXISTS fuel_entries (id TEXT PRIMARY KEY, vehicle_id TEXT NOT NULL REFERENCES vehicles(id) ON DELETE RESTRICT, date TEXT NOT NULL, fuel_type TEXT NOT NULL, liters REAL NOT NULL, amount REAL NOT NULL, station TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', odometer REAL, full_tank INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT);
+      CREATE TABLE IF NOT EXISTS fuel_entries (id TEXT PRIMARY KEY, vehicle_id TEXT NOT NULL REFERENCES vehicles(id) ON DELETE RESTRICT, date TEXT NOT NULL, time TEXT NOT NULL DEFAULT '', fuel_type TEXT NOT NULL, liters REAL NOT NULL, amount REAL NOT NULL, station TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', odometer REAL, full_tank INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT);
       CREATE TABLE IF NOT EXISTS maintenance (id TEXT PRIMARY KEY, vehicle_id TEXT NOT NULL REFERENCES vehicles(id) ON DELETE RESTRICT, category TEXT NOT NULL, description TEXT NOT NULL, date TEXT NOT NULL, odometer REAL, amount REAL, next_date TEXT NOT NULL DEFAULT '', next_odometer REAL, notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT);
       CREATE INDEX IF NOT EXISTS idx_fuel_vehicle_date ON fuel_entries(vehicle_id, date DESC);
       CREATE INDEX IF NOT EXISTS idx_maintenance_vehicle_date ON maintenance(vehicle_id, date DESC);
       CREATE INDEX IF NOT EXISTS idx_maintenance_next_date ON maintenance(next_date) WHERE next_date != '';
       PRAGMA optimize;
     `);
+    const fuelColumns = this.db.prepare('PRAGMA table_info(fuel_entries)').all();
+    if (!fuelColumns.some((column) => column.name === 'time')) this.db.exec("ALTER TABLE fuel_entries ADD COLUMN time TEXT NOT NULL DEFAULT ''");
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_fuel_vehicle_datetime ON fuel_entries(vehicle_id, date DESC, time DESC)');
     const defaultVehicle = this.ensureDefaultVehicle();
     await this.migrateLegacyJson(defaultVehicle.id);
   }
@@ -123,23 +133,23 @@ class FuelStore {
   }
 
   list(vehicleId = '') {
-    const rows = vehicleId ? this.db.prepare('SELECT * FROM fuel_entries WHERE vehicle_id = ? ORDER BY date DESC, created_at DESC').all(vehicleId) : this.db.prepare('SELECT * FROM fuel_entries ORDER BY date DESC, created_at DESC').all();
+    const rows = vehicleId ? this.db.prepare('SELECT * FROM fuel_entries WHERE vehicle_id = ? ORDER BY date DESC, time DESC, created_at DESC').all(vehicleId) : this.db.prepare('SELECT * FROM fuel_entries ORDER BY date DESC, time DESC, created_at DESC').all();
     return rows.map((row) => this.mapEntry(row));
   }
   getEntry(id) { const row = this.db.prepare('SELECT * FROM fuel_entries WHERE id = ?').get(id); return row ? this.mapEntry(row) : null; }
-  mapEntry(row) { return { id: row.id, vehicleId: row.vehicle_id, date: row.date, fuelType: row.fuel_type, liters: row.liters, amount: row.amount, station: row.station, notes: row.notes, odometer: row.odometer, fullTank: row.full_tank === 1, createdAt: row.created_at, updatedAt: row.updated_at }; }
+  mapEntry(row) { return { id: row.id, vehicleId: row.vehicle_id, date: row.date, time: row.time || '', fuelType: row.fuel_type, liters: row.liters, amount: row.amount, station: row.station, notes: row.notes, odometer: row.odometer, fullTank: row.full_tank === 1, createdAt: row.created_at, updatedAt: row.updated_at }; }
   create(input) {
     const valid = validateEntry(input); if (!this.vehicleExists(valid.vehicleId)) throw new Error('Veículo não encontrado.');
     const id = crypto.randomUUID(); const now = new Date().toISOString();
-    this.db.prepare(`INSERT INTO fuel_entries (id, vehicle_id, date, fuel_type, liters, amount, station, notes, odometer, full_tank, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, valid.vehicleId, valid.date, valid.fuelType, valid.liters, valid.amount, valid.station, valid.notes, valid.odometer, valid.fullTank ? 1 : 0, now);
+    this.db.prepare(`INSERT INTO fuel_entries (id, vehicle_id, date, time, fuel_type, liters, amount, station, notes, odometer, full_tank, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, valid.vehicleId, valid.date, valid.time, valid.fuelType, valid.liters, valid.amount, valid.station, valid.notes, valid.odometer, valid.fullTank ? 1 : 0, now);
     return this.getEntry(id);
   }
   update(id, input) {
     if (!this.getEntry(id)) return null;
     const valid = validateEntry(input); if (!this.vehicleExists(valid.vehicleId)) throw new Error('Veículo não encontrado.');
-    this.db.prepare(`UPDATE fuel_entries SET vehicle_id=?, date=?, fuel_type=?, liters=?, amount=?, station=?, notes=?, odometer=?, full_tank=?, updated_at=? WHERE id=?`)
-      .run(valid.vehicleId, valid.date, valid.fuelType, valid.liters, valid.amount, valid.station, valid.notes, valid.odometer, valid.fullTank ? 1 : 0, new Date().toISOString(), id);
+    this.db.prepare(`UPDATE fuel_entries SET vehicle_id=?, date=?, time=?, fuel_type=?, liters=?, amount=?, station=?, notes=?, odometer=?, full_tank=?, updated_at=? WHERE id=?`)
+      .run(valid.vehicleId, valid.date, valid.time, valid.fuelType, valid.liters, valid.amount, valid.station, valid.notes, valid.odometer, valid.fullTank ? 1 : 0, new Date().toISOString(), id);
     return this.getEntry(id);
   }
   remove(id) { return this.db.prepare('DELETE FROM fuel_entries WHERE id = ?').run(id).changes > 0; }

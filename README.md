@@ -4,7 +4,7 @@ Aplicação web responsiva para acompanhar combustível, consumo e manutenção 
 
 O painel inclui:
 
-- cadastro e edição de abastecimentos com hodômetro e tanque completo ou parcial;
+- cadastro e edição de abastecimentos com data, hora opcional, hodômetro e tanque completo ou parcial;
 - consumo médio em km/L, custo por quilômetro e aviso de queda de rendimento;
 - preço médio geral e por combustível;
 - vários veículos, cada um com seu próprio histórico;

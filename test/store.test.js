@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const { DatabaseSync } = require('node:sqlite');
 const { FuelStore, validateEntry, validateMaintenance, validateVehicle } = require('../src/store');
 
 async function makeStore(prefix = 'gascost-') {
@@ -13,11 +14,12 @@ async function makeStore(prefix = 'gascost-') {
 }
 
 test('valida e normaliza um abastecimento completo', () => {
-  const result = validateEntry({ vehicleId: 'vehicle-1', date: '2026-09-08', fuelType: 'Gasolina', liters: '42.5678', amount: '250.129', odometer: '50000', fullTank: true });
+  const result = validateEntry({ vehicleId: 'vehicle-1', date: '2026-09-08', time: '17:45', fuelType: 'Gasolina', liters: '42.5678', amount: '250.129', odometer: '50000', fullTank: true });
   assert.equal(result.liters, 42.568);
   assert.equal(result.amount, 250.13);
   assert.equal(result.odometer, 50000);
   assert.equal(result.fullTank, true);
+  assert.equal(result.time, '17:45');
 });
 
 test('rejeita veículo ausente e valores inválidos', () => {
@@ -25,17 +27,19 @@ test('rejeita veículo ausente e valores inválidos', () => {
   assert.throws(() => validateEntry({ vehicleId: 'v', date: '2026-09-08', fuelType: 'Etanol', liters: 0, amount: 10 }), /quantidade/i);
   assert.throws(() => validateVehicle({ name: '', fuelType: 'Gasolina' }), /nome/i);
   assert.throws(() => validateMaintenance({ vehicleId: 'v', category: 'Inválida', description: 'Teste', date: '2026-09-08' }), /categoria/i);
+  assert.throws(() => validateEntry({ vehicleId: 'v', date: '2026-09-08', time: '25:70', fuelType: 'Etanol', liters: 10, amount: 40 }), /hora/i);
 });
 
 test('persiste, edita e remove abastecimentos no SQLite', async () => {
   const { store, directory, vehicle } = await makeStore();
   const created = store.create({ vehicleId: vehicle.id, date: '2026-09-08', fuelType: 'Diesel', liters: 10, amount: 60, odometer: 40000, fullTank: true });
   assert.equal(store.list(vehicle.id).length, 1);
-  const updated = store.update(created.id, { vehicleId: vehicle.id, date: '2026-09-07', fuelType: 'Etanol', liters: 25, amount: 100, station: 'Posto Novo', fullTank: false });
+  const updated = store.update(created.id, { vehicleId: vehicle.id, date: '2026-09-07', time: '08:35', fuelType: 'Etanol', liters: 25, amount: 100, station: 'Posto Novo', fullTank: false });
   assert.equal(updated.id, created.id);
   assert.equal(updated.createdAt, created.createdAt);
   assert.equal(updated.station, 'Posto Novo');
   assert.equal(updated.fullTank, false);
+  assert.equal(updated.time, '08:35');
   store.close();
 
   const reloaded = new FuelStore(path.join(directory, 'gascost.db'), path.join(directory, 'fuel.json'));
@@ -87,5 +91,38 @@ test('backup reúne todos os conjuntos de dados', async () => {
   assert.equal(backup.vehicles.length, 1);
   assert.equal(backup.fuelEntries.length, 1);
   assert.deepEqual(backup.maintenance, []);
+  store.close();
+});
+
+test('lista abastecimentos por data e hora, mesmo quando cadastrados fora de ordem', async () => {
+  const { store, vehicle } = await makeStore('gascost-order-');
+  const base = { vehicleId: vehicle.id, date: '2026-09-20', fuelType: 'Gasolina', liters: 10, amount: 60, fullTank: false };
+  store.create({ ...base, time: '18:30', station: 'Último' });
+  store.create({ ...base, time: '08:15', station: 'Primeiro' });
+  store.create({ ...base, time: '12:00', station: 'Meio' });
+
+  assert.deepEqual(store.list(vehicle.id).map((item) => item.station), ['Último', 'Meio', 'Primeiro']);
+  store.close();
+});
+
+test('adiciona a coluna de hora em bancos criados por versões anteriores', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'gascost-schema-'));
+  const dbPath = path.join(directory, 'gascost.db');
+  const oldDatabase = new DatabaseSync(dbPath);
+  oldDatabase.exec(`CREATE TABLE fuel_entries (
+    id TEXT PRIMARY KEY, vehicle_id TEXT NOT NULL, date TEXT NOT NULL,
+    fuel_type TEXT NOT NULL, liters REAL NOT NULL, amount REAL NOT NULL,
+    station TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', odometer REAL,
+    full_tank INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT
+  )`);
+  oldDatabase.close();
+
+  const store = new FuelStore(dbPath, path.join(directory, 'fuel.json'));
+  await store.init();
+  const columns = store.db.prepare('PRAGMA table_info(fuel_entries)').all().map((column) => column.name);
+  assert.ok(columns.includes('time'));
+  const vehicle = store.listVehicles()[0];
+  const created = store.create({ vehicleId: vehicle.id, date: '2026-09-20', time: '07:10', fuelType: 'Gasolina', liters: 20, amount: 120, fullTank: true });
+  assert.equal(created.time, '07:10');
   store.close();
 });

@@ -87,6 +87,7 @@ dialog form { padding: 28px; }
 .form-grid label { color: #39453e; font-size: 12px; font-weight: 750; }
 .form-grid label span { color: var(--muted); font-weight: 500; }
 .form-grid input, .form-grid select, .form-grid textarea { margin-top: 7px; }
+.form-grid label > small { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; font-weight: 500; }
 .form-grid textarea { resize: vertical; }
 .checkbox-label { display: flex; align-items: center; gap: 10px; padding-top: 20px; }
 .checkbox-label input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--green); }

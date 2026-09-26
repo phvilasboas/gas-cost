@@ -11,6 +11,7 @@ const integer = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
 const monthFormat = new Intl.DateTimeFormat('pt-BR', { month: 'short' });
 const colors = { Gasolina: '#277c59', Etanol: '#e78546', Diesel: '#5d91a8', GNV: '#9b7cba', Outro: '#9a9588' };
+const { calculateConsumption, compareEntriesNewestFirst } = globalThis.GasCostCalculations;
 
 function localDate() {
   const now = new Date();
@@ -18,7 +19,7 @@ function localDate() {
 }
 
 function dateValue(value) { return new Date(`${value}T12:00:00`); }
-function vehicleEntries() { return state.entries.filter((entry) => entry.vehicleId === state.selectedVehicleId); }
+function vehicleEntries() { return state.entries.filter((entry) => entry.vehicleId === state.selectedVehicleId).sort(compareEntriesNewestFirst); }
 function vehicleMaintenance() { return state.maintenance.filter((item) => item.vehicleId === state.selectedVehicleId); }
 
 function inPeriod(entry) {
@@ -42,31 +43,6 @@ function api(url, options = {}) {
     if (!response.ok) throw new Error(result.error || 'Não foi possível concluir a operação.');
     return result;
   });
-}
-
-function calculateConsumption(entries) {
-  const ordered = entries.filter((entry) => entry.odometer !== null)
-    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
-  const samples = [];
-  let previousFull = null; let liters = 0; let amount = 0;
-  for (const entry of ordered) {
-    if (!previousFull) {
-      if (entry.fullTank) previousFull = entry;
-      continue;
-    }
-    liters += entry.liters; amount += entry.amount;
-    if (entry.fullTank) {
-      const distance = entry.odometer - previousFull.odometer;
-      if (distance > 0 && liters > 0) {
-        samples.push({ entryId: entry.id, date: entry.date, distance, liters, amount, kmPerLiter: distance / liters, costPerKm: amount / distance });
-      }
-      previousFull = entry; liters = 0; amount = 0;
-    }
-  }
-  const totalDistance = samples.reduce((sum, sample) => sum + sample.distance, 0);
-  const totalLiters = samples.reduce((sum, sample) => sum + sample.liters, 0);
-  const totalAmount = samples.reduce((sum, sample) => sum + sample.amount, 0);
-  return { samples, kmPerLiter: totalLiters ? totalDistance / totalLiters : null, costPerKm: totalDistance ? totalAmount / totalDistance : null };
 }
 
 function render() {
@@ -93,7 +69,8 @@ function render() {
   const sampleMap = new Map(allConsumption.samples.map((sample) => [sample.entryId, sample]));
   $('#entries').innerHTML = visible.map((entry) => {
     const sample = sampleMap.get(entry.id);
-    const details = [dateFormat.format(dateValue(entry.date)), entry.station && escapeHtml(entry.station), entry.odometer !== null && `${integer.format(entry.odometer)} km`].filter(Boolean).join(' · ');
+    const entryDate = `${dateFormat.format(dateValue(entry.date))}${entry.time ? ` às ${escapeHtml(entry.time)}` : ''}`;
+    const details = [entryDate, entry.station && escapeHtml(entry.station), entry.odometer !== null && `${integer.format(entry.odometer)} km`].filter(Boolean).join(' · ');
     return `<article class="entry">
       <span class="fuel-dot" style="color:${colors[entry.fuelType] || colors.Outro}">●</span>
       <div class="entry-main"><strong>${escapeHtml(entry.fuelType)}</strong><small>${details}</small>${sample ? `<em>${number.format(sample.kmPerLiter)} km/L · ${money.format(sample.costPerKm)}/km</em>` : ''}</div>
@@ -204,7 +181,7 @@ function fillVehicleSelectors() {
 function openEntryForm(entry = null) {
   const form = $('#entry-form'); form.reset(); $('#form-error').textContent = ''; state.editingId = entry?.id || null;
   $('#form-eyebrow').textContent = entry ? 'AJUSTAR REGISTRO' : 'NOVO REGISTRO'; $('#form-title').textContent = entry ? 'Editar abastecimento' : 'Adicionar abastecimento'; $('#save-entry').textContent = entry ? 'Salvar alterações' : 'Salvar abastecimento';
-  form.elements.vehicleId.value = entry?.vehicleId || state.selectedVehicleId; form.elements.date.value = entry?.date || localDate();
+  form.elements.vehicleId.value = entry?.vehicleId || state.selectedVehicleId; form.elements.date.value = entry?.date || localDate(); form.elements.time.value = entry?.time || '';
   if (entry) { form.elements.fuelType.value = entry.fuelType; form.elements.liters.value = entry.liters; form.elements.amount.value = entry.amount; form.elements.odometer.value = entry.odometer ?? ''; form.elements.fullTank.checked = entry.fullTank; form.elements.station.value = entry.station || ''; form.elements.notes.value = entry.notes || ''; }
   $('#entry-dialog').showModal();
 }
@@ -281,16 +258,16 @@ function xmlEscape(value) { return String(value ?? '').replaceAll('&', '&amp;').
 function download(content, type, filename) { const url = URL.createObjectURL(new Blob([content], { type })); const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 function exportRows() {
   const vehicle = state.vehicles.find((item) => item.id === state.selectedVehicleId);
-  return vehicleEntries().map((entry) => [entry.date, vehicle?.name || '', entry.fuelType, entry.liters, entry.amount, (entry.amount / entry.liters).toFixed(3), entry.odometer ?? '', entry.fullTank ? 'Sim' : 'Não', entry.station, entry.notes]);
+  return vehicleEntries().map((entry) => [entry.date, entry.time || '', vehicle?.name || '', entry.fuelType, entry.liters, entry.amount, (entry.amount / entry.liters).toFixed(3), entry.odometer ?? '', entry.fullTank ? 'Sim' : 'Não', entry.station, entry.notes]);
 }
 
 $('#export-csv').addEventListener('click', () => {
-  const headings = ['Data', 'Veículo', 'Combustível', 'Litros', 'Valor', 'Preço por litro', 'Hodômetro', 'Tanque completo', 'Posto', 'Observações'];
+  const headings = ['Data', 'Hora', 'Veículo', 'Combustível', 'Litros', 'Valor', 'Preço por litro', 'Hodômetro', 'Tanque completo', 'Posto', 'Observações'];
   const csv = [headings, ...exportRows()].map((row) => row.map(csvCell).join(';')).join('\r\n'); download(`\ufeff${csv}`, 'text/csv;charset=utf-8', `gascost-${localDate()}.csv`); toast('Relatório CSV preparado.');
 });
 
 $('#export-excel').addEventListener('click', () => {
-  const headings = ['Data', 'Veículo', 'Combustível', 'Litros', 'Valor', 'Preço por litro', 'Hodômetro', 'Tanque completo', 'Posto', 'Observações'];
+  const headings = ['Data', 'Hora', 'Veículo', 'Combustível', 'Litros', 'Valor', 'Preço por litro', 'Hodômetro', 'Tanque completo', 'Posto', 'Observações'];
   const sheet = [headings, ...exportRows()].map((row) => `<Row>${row.map((cell) => `<Cell><Data ss:Type="String">${xmlEscape(cell)}</Data></Cell>`).join('')}</Row>`).join('');
   const maintenanceRows = vehicleMaintenance().map((item) => [item.date, item.category, item.description, item.odometer ?? '', item.amount ?? '', item.nextDate, item.nextOdometer ?? '', item.notes]);
   const maintenanceHeadings = ['Data', 'Categoria', 'Descrição', 'Hodômetro', 'Valor', 'Próxima data', 'Próxima quilometragem', 'Observações'];
