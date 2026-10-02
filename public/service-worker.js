@@ -1,5 +1,5 @@
-const CACHE = 'gascost-static-v8';
-const STATIC_FILES = ['/assets/styles-v5.css', '/assets/calculations-v2.js', '/assets/app-v8.js', '/assets/auth-v3.js', '/icon.svg', '/icon-192.png', '/icon-512.png', '/manifest.webmanifest'];
+const CACHE = 'gascost-static-v9';
+const STATIC_FILES = ['/assets/styles-v6.css', '/assets/calculations-v2.js', '/assets/app-v9.js', '/assets/auth-v3.js', '/icon.svg', '/icon-192.png', '/icon-512.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(STATIC_FILES)).then(() => self.skipWaiting()));

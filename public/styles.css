@@ -100,7 +100,8 @@ dialog form { padding: 28px; }
 .toast { position: fixed; right: 24px; bottom: 24px; z-index: 10; padding: 13px 18px; border-radius: 10px; color: white; background: #213c2e; box-shadow: var(--shadow); opacity: 0; transform: translateY(12px); pointer-events: none; transition: .2s; }
 .toast.show { opacity: 1; transform: translateY(0); }
 .install-button { padding: 8px 11px; border: 1px solid #b7c9ba; border-radius: 9px; color: var(--green); background: #eef4ee; font-size: 12px; font-weight: 750; }
-.dashboard-controls { display: flex; align-items: end; gap: 12px; }
+.dashboard-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+#monthly-chart { overflow-x: auto; }
 .control-group { min-width: 175px; }
 .control-group label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .vehicle-control { min-width: 300px; }

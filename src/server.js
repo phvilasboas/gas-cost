@@ -170,6 +170,8 @@ async function serveStatic(urlPath, res) {
     '/assets/styles-v5.css': '/styles.css',
     '/assets/app-v7.js': '/app.js',
     '/assets/app-v8.js': '/app.js',
+    '/assets/app-v9.js': '/app.js',
+    '/assets/styles-v6.css': '/styles.css',
   };
   const requested = urlPath === '/' ? '/index.html' : (assetAliases[urlPath] || urlPath);
   const safePath = path.normalize(requested).replace(/^(\.\.[/\\])+/, '');

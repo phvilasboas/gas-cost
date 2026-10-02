@@ -8,7 +8,7 @@
   <title>GasCost — Controle do veículo</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/assets/styles-v5.css">
+  <link rel="stylesheet" href="/assets/styles-v6.css">
 </head>
 <body>
   <div class="shell">
@@ -35,7 +35,9 @@
         </div>
         <div class="dashboard-controls">
           <div class="control-group vehicle-control"><label for="vehicle-filter">Veículo</label><div class="control-row"><select id="vehicle-filter"></select><button class="square-button" id="manage-vehicle" type="button" aria-label="Gerenciar veículo">✎</button><button class="square-button" id="add-vehicle" type="button" aria-label="Adicionar veículo">＋</button></div></div>
-          <div class="control-group"><label for="period">Período</label><select id="period"><option value="all">Todo o período</option><option value="month">Este mês</option><option value="30">Últimos 30 dias</option><option value="year">Este ano</option></select></div>
+          <div class="control-group"><label for="period">Período</label><select id="period"><option value="all">Todo o período</option><option value="calendar">Por ano e mês</option><option value="month">Este mês</option><option value="30">Últimos 30 dias</option><option value="year">Este ano</option></select></div>
+          <div class="control-group" id="year-control" hidden><label for="filter-year">Ano</label><select id="filter-year"></select></div>
+          <div class="control-group" id="month-control" hidden><label for="filter-month">Mês</label><select id="filter-month"><option value="all">Todos os meses</option><option value="01">Janeiro</option><option value="02">Fevereiro</option><option value="03">Março</option><option value="04">Abril</option><option value="05">Maio</option><option value="06">Junho</option><option value="07">Julho</option><option value="08">Agosto</option><option value="09">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select></div>
         </div>
       </section>
 
@@ -160,6 +162,6 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="/assets/calculations-v2.js" defer></script>
-  <script src="/assets/app-v8.js" defer></script>
+  <script src="/assets/app-v9.js" defer></script>
 </body>
 </html>

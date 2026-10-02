@@ -1,6 +1,7 @@
 const state = {
   vehicles: [], entries: [], maintenance: [], selectedVehicleId: '',
   period: 'all', fuel: 'all', editingId: null, editingVehicleId: null,
+  filterYear: String(new Date().getFullYear()), filterMonth: 'all',
   editingMaintenanceId: null, deferredInstall: null, currentUser: null,
   mcpTokens: [], users: [], revealedToken: '',
 };
@@ -25,12 +26,24 @@ function vehicleMaintenance() { return state.maintenance.filter((item) => item.v
 
 function inPeriod(entry) {
   if (state.period === 'all') return true;
+  if (state.period === 'calendar') return entry.date.slice(0, 4) === state.filterYear &&
+    (state.filterMonth === 'all' || entry.date.slice(5, 7) === state.filterMonth);
   const value = dateValue(entry.date);
   const now = new Date();
   if (state.period === 'month') return value.getMonth() === now.getMonth() && value.getFullYear() === now.getFullYear();
   if (state.period === 'year') return value.getFullYear() === now.getFullYear();
   const limit = new Date(); limit.setHours(0, 0, 0, 0); limit.setDate(limit.getDate() - 30);
   return value >= limit;
+}
+
+function fillDateFilters() {
+  const years = [...new Set([String(new Date().getFullYear()), state.filterYear,
+    ...state.entries.map((entry) => entry.date.slice(0, 4))])].sort((a, b) => Number(b) - Number(a));
+  $('#filter-year').replaceChildren(...years.map((year) => new Option(year, year)));
+  $('#filter-year').value = state.filterYear;
+  $('#filter-month').value = state.filterMonth;
+  $('#year-control').hidden = state.period !== 'calendar';
+  $('#month-control').hidden = state.period !== 'calendar';
 }
 
 function escapeHtml(value) {
@@ -101,6 +114,7 @@ async function loadOAuthConnections() {
 }
 
 function render() {
+  fillDateFilters();
   const allVehicleEntries = vehicleEntries();
   const periodEntries = allVehicleEntries.filter(inPeriod);
   const visible = periodEntries.filter((entry) => state.fuel === 'all' || entry.fuelType === state.fuel);
@@ -163,8 +177,10 @@ function renderFuelChart(entries, consumption) {
 }
 
 function lastSixMonths() {
-  const now = new Date(); const months = [];
-  for (let offset = 5; offset >= 0; offset -= 1) {
+  const calendar = state.period === 'calendar';
+  const now = calendar ? new Date(Number(state.filterYear), state.filterMonth === 'all' ? 11 : Number(state.filterMonth) - 1, 1) : new Date();
+  const months = [];
+  for (let offset = calendar && state.filterMonth === 'all' ? 11 : 5; offset >= 0; offset -= 1) {
     const value = new Date(now.getFullYear(), now.getMonth() - offset, 1);
     months.push({ key: `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}`, label: monthFormat.format(value).replace('.', '') });
   }
@@ -173,11 +189,15 @@ function lastSixMonths() {
 
 function renderMonthlyChart(entries) {
   const months = lastSixMonths().map((month) => ({ ...month, amount: 0, liters: 0 }));
+  $('#monthly-chart').style.gridTemplateColumns = `repeat(${months.length}, minmax(36px, 1fr))`;
   const lookup = new Map(months.map((month) => [month.key, month]));
   entries.forEach((entry) => { const month = lookup.get(entry.date.slice(0, 7)); if (month) { month.amount += entry.amount; month.liters += entry.liters; } });
   const maximum = Math.max(...months.map((month) => month.amount), 1);
   $('#monthly-chart').innerHTML = months.map((month) => `<div class="month-column"><strong>${month.amount ? money.format(month.amount) : '—'}</strong><div class="month-track"><span style="height:${Math.max(month.amount ? 8 : 0, month.amount / maximum * 100)}%"></span></div><small>${escapeHtml(month.label)}</small></div>`).join('');
   const current = months.at(-1).amount; const previous = months.at(-2).amount;
+  if (state.period === 'calendar' && state.filterMonth === 'all') {
+    $('#month-comparison').textContent = state.filterYear; $('#month-comparison').className = 'comparison'; return;
+  }
   if (!previous) { $('#month-comparison').textContent = current ? 'Primeiro mês comparável' : 'Sem dados recentes'; $('#month-comparison').className = 'comparison'; }
   else {
     const change = (current - previous) / previous * 100;
@@ -385,6 +405,8 @@ $('#password-form').addEventListener('submit', async (event) => {
 
 $('#vehicle-filter').addEventListener('change', (event) => { state.selectedVehicleId = event.target.value; localStorage.setItem('gascost.vehicle', state.selectedVehicleId); fillVehicleSelectors(); render(); });
 $('#period').addEventListener('change', (event) => { state.period = event.target.value; render(); });
+$('#filter-year').addEventListener('change', (event) => { state.filterYear = event.target.value; render(); });
+$('#filter-month').addEventListener('change', (event) => { state.filterMonth = event.target.value; render(); });
 $('#fuel-filter').addEventListener('change', (event) => { state.fuel = event.target.value; render(); });
 $('#open-form').addEventListener('click', () => openEntryForm());
 document.querySelectorAll('[data-open-form]').forEach((button) => button.addEventListener('click', () => openEntryForm()));
